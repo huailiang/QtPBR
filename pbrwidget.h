@@ -2,7 +2,7 @@
 #define PBRWIDGET_H
 
 #include <QOpenGLWidget>
-#include <QOpenGLFunctions_4_1_Core>
+#include <QOpenGLFunctions>
 #include <QOpenGLShaderProgram>
 #include <QOpenGLVertexArrayObject>
 #include <QOpenGLBuffer>
@@ -17,7 +17,7 @@
 struct aiNode;
 struct aiScene;
 
-class PBRWidget : public QOpenGLWidget, protected QOpenGLFunctions_4_1_Core
+class PBRWidget : public QOpenGLWidget
 {
     Q_OBJECT
 public:
@@ -50,8 +50,8 @@ private:
         float metallic = 0.5f;
         float roughness = 0.5f;
 
-        void setupMesh(QOpenGLFunctions_4_1_Core *gl);
-        void draw(QOpenGLShaderProgram &program, QOpenGLFunctions_4_1_Core *gl);
+        void setupMesh(QOpenGLFunctions *gl);
+        void draw(QOpenGLShaderProgram &program, QOpenGLFunctions *gl);
     };
 
     void loadModel(const QString &path);
@@ -60,6 +60,7 @@ private:
 
     QOpenGLShaderProgram m_program;
     std::vector<std::unique_ptr<Mesh>> m_meshes;
+    QOpenGLFunctions *m_glFunc = nullptr;  // 缓存 OpenGL 函数指针
 
     // camera
     QVector3D m_cameraPos;

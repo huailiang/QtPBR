@@ -9,6 +9,7 @@
 #include <QOpenGLShaderProgram>
 #include <QOpenGLBuffer>
 #include <QOpenGLVertexArrayObject>
+#include <QOpenGLContext>
 #include <QMouseEvent>
 #include <QWheelEvent>
 #include <QFile>
@@ -20,7 +21,7 @@
 
 // 顶点着色器
 static const char *vertexShaderSource = R"(
-#version 410 core
+#version 330 core
 layout (location = 0) in vec3 aPos;
 layout (location = 1) in vec3 aNormal;
 layout (location = 2) in vec2 aTexCoord;
@@ -45,7 +46,7 @@ void main()
 
 // 片段着色器（PBR 直接光照）
 static const char *fragmentShaderSource = R"(
-#version 410 core
+#version 330 core
 out vec4 FragColor;
 
 in vec3 WorldPos;
@@ -169,9 +170,14 @@ PBRWidget::~PBRWidget()
 
 void PBRWidget::initializeGL()
 {
-    initializeOpenGLFunctions();
+    // 获取 OpenGL 函数指针（必须在此调用，因为上下文已激活）
+    m_glFunc = QOpenGLContext::currentContext()->functions();
+    if (!m_glFunc) {
+        qCritical() << "Failed to get OpenGL functions";
+        return;
+    }
 
-    glEnable(GL_DEPTH_TEST);
+    m_glFunc->glEnable(GL_DEPTH_TEST);
 
     m_program.create();
     if (!m_program.addShaderFromSourceCode(QOpenGLShader::Vertex, vertexShaderSource))
@@ -189,7 +195,7 @@ void PBRWidget::initializeGL()
         qDebug() << "No mesh loaded, generating a sphere.";
         auto mesh = std::make_unique<Mesh>();
         generateSphereMesh(*mesh, 1.0f, 64, 64);
-        mesh->setupMesh(this);
+        mesh->setupMesh(m_glFunc);  // 传递 OpenGL 函数指针
         m_meshes.push_back(std::move(mesh));
     }
 
@@ -199,8 +205,8 @@ void PBRWidget::initializeGL()
 
 void PBRWidget::paintGL()
 {
-    glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    m_glFunc->glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
+    m_glFunc->glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
     m_program.bind();
 
@@ -215,7 +221,7 @@ void PBRWidget::paintGL()
     m_program.setUniformValueArray("lightColors", m_lightColors, 1);
 
     for (auto &mesh : m_meshes) {
-        mesh->draw(m_program, this);
+        mesh->draw(m_program, m_glFunc);
     }
 
     m_program.release();
@@ -311,7 +317,6 @@ void PBRWidget::loadModel(const QString &path)
         return;
     }
 
-    // 直接传递 const aiScene*，不再需要 const_cast
     processAssimpNode(scene->mRootNode, scene);
 }
 
@@ -346,12 +351,12 @@ void PBRWidget::processAssimpNode(aiNode *node, const aiScene *scene)
             material->Get(AI_MATKEY_COLOR_DIFFUSE, color);
             ourMesh->albedo = QVector3D(color.r, color.g, color.b);
 
-            // 简化：金属度和粗糙度使用固定值，实际可从材质自定义属性读取
+            // 简化：金属度和粗糙度使用固定值
             ourMesh->metallic = 0.2f;
             ourMesh->roughness = 0.3f;
         }
 
-        ourMesh->setupMesh(this);
+        ourMesh->setupMesh(m_glFunc);
         m_meshes.push_back(std::move(ourMesh));
     }
 
@@ -412,7 +417,9 @@ void PBRWidget::generateSphereMesh(Mesh &mesh, float radius, int sectors, int st
     mesh.roughness = 0.3f;
 }
 
-void PBRWidget::Mesh::setupMesh(QOpenGLFunctions_4_1_Core *gl) {
+// Mesh::setupMesh 实现
+void PBRWidget::Mesh::setupMesh(QOpenGLFunctions *gl)
+{
     vao.create();
     vao.bind();
 
@@ -441,7 +448,8 @@ void PBRWidget::Mesh::setupMesh(QOpenGLFunctions_4_1_Core *gl) {
     vao.release();
 }
 
-void PBRWidget::Mesh::draw(QOpenGLShaderProgram &program, QOpenGLFunctions_4_1_Core *gl)
+// Mesh::draw 实现
+void PBRWidget::Mesh::draw(QOpenGLShaderProgram &program, QOpenGLFunctions *gl)
 {
     program.setUniformValue("albedo", albedo);
     program.setUniformValue("metallic", metallic);
