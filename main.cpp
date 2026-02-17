@@ -1,15 +1,15 @@
-#include <QGuiApplication>
-#include <QQmlApplicationEngine>
+#include <QApplication>
+#include <QMainWindow>
+#include "pbrwidget.h"
 
 int main(int argc, char *argv[])
 {
-    QGuiApplication app(argc, argv);
-
-    QQmlApplicationEngine engine;
-    // 加载主 QML 文件
-    engine.load(QUrl(QStringLiteral("qrc:/main.qml")));
-    if (engine.rootObjects().isEmpty())
-        return -1;
-
+    QApplication app(argc, argv);
+    QMainWindow window;
+    window.setWindowTitle("Qt PBR Mesh Demo");
+    PBRWidget *pbrWidget = new PBRWidget(&window);
+    window.setCentralWidget(pbrWidget);
+    window.resize(1024, 768);
+    window.show();
     return app.exec();
 }
