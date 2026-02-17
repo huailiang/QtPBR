@@ -1,10 +1,13 @@
-import QtQuick 2.15
-import QtQuick3D 1.15
-import QtQuick3D.Helpers 1.15   // 提供 WASD 控制器
+import QtQuick
+import QtQuick.Window
+import QtQuick3D
+import QtQuick3D.Helpers
 
-Item {
-    width: 1280
-    height: 720
+Window {
+    width: 800
+    height: 600
+    visible: true
+    title: "Test"
 
     View3D {
         id: view3D
@@ -19,7 +22,7 @@ Item {
         // 2. 相机 - 透视相机，让用户能观察场景
         PerspectiveCamera {
             id: camera
-            position: Qt.vector3d(0, 200, 400) // 初始位置：稍高稍远
+            position: Qt.vector3d(0, 1, 50) // 初始位置：稍高稍远
             clipNear: 1.0
             clipFar: 10000
         }
@@ -39,15 +42,11 @@ Item {
             color: "white"
         }
 
-        // 4. 模型加载 - 这是你关注的重点
+         // 4. 模型加载 - 这是你关注的重点
         Model {
             id: myModel
-            // 使用 Qt 资源系统中的模型文件路径
             // 假设你将模型放在 "models/" 目录下，并通过 .qrc 文件添加
-            source: "qrc:/models/your_model.mesh"
-
-            // 如果没有预处理模型，也可以直接加载 glTF 文件 (Qt 6.5+ 支持)
-            // source: "qrc:/models/your_model.gltf"
+            source: "qrc:/assets/meshes/city50.mesh"
 
             // 调整模型的位置、缩放和旋转
             position: Qt.vector3d(0, 0, 0)
@@ -58,30 +57,21 @@ Item {
             // 但如果想手动覆盖材质，可以像下面这样设置
             materials: [
                 PrincipledMaterial {
-                    baseColor: "#cccccc"   // 基础灰色
-                    metalness: 0.1
-                    roughness: 0.8
+                    baseColor: "#cccc00"   // 基础灰色
+                    metalness: 0.9
+                    roughness: 0.2
                 }
             ]
-
-            // 调试：打印模型加载状态
-            onStatusChanged: {
-                if (status === Model.Ready) {
-                    console.log("Model loaded successfully")
-                } else if (status === Model.Error) {
-                    console.error("Model loading failed:", errorString)
-                }
-            }
         }
 
         // 5. 交互控制器 - 让你能用鼠标和键盘在场景中移动
         WasdController {
             controlledObject: camera
-            speed: 200
+            speed: 0.2
         }
     }
 
-    // 简单的提示文本
+     // 简单的提示文本
     Text {
         anchors {
             left: parent.left
