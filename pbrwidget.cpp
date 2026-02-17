@@ -9,145 +9,12 @@
 #include <QOpenGLShaderProgram>
 #include <QOpenGLBuffer>
 #include <QOpenGLVertexArrayObject>
-#include <QOpenGLContext>
 #include <QMouseEvent>
-#include <QWheelEvent>
 #include <QFile>
-#include <QDebug>
-#include <cmath>
 #include <vector>
 #include <memory>
 #include <cstddef>
 
-// 顶点着色器
-static const char *vertexShaderSource = R"(
-#version 330 core
-layout (location = 0) in vec3 aPos;
-layout (location = 1) in vec3 aNormal;
-layout (location = 2) in vec2 aTexCoord;
-
-out vec3 WorldPos;
-out vec3 Normal;
-out vec2 TexCoord;
-
-uniform mat4 projection;
-uniform mat4 view;
-uniform mat4 model;
-
-void main()
-{
-    WorldPos = vec3(model * vec4(aPos, 1.0));
-    Normal = mat3(transpose(inverse(model))) * aNormal;
-    TexCoord = aTexCoord;
-
-    gl_Position = projection * view * vec4(WorldPos, 1.0);
-}
-)";
-
-// 片段着色器（PBR 直接光照）
-static const char *fragmentShaderSource = R"(
-#version 330 core
-out vec4 FragColor;
-
-in vec3 WorldPos;
-in vec3 Normal;
-in vec2 TexCoord;
-
-uniform vec3 camPos;
-
-uniform vec3 albedo;
-uniform float metallic;
-uniform float roughness;
-
-uniform vec3 lightPositions[1];
-uniform vec3 lightColors[1];
-
-const float PI = 3.14159265359;
-
-float DistributionGGX(vec3 N, vec3 H, float roughness)
-{
-    float a = roughness*roughness;
-    float a2 = a*a;
-    float NdotH = max(dot(N, H), 0.0);
-    float NdotH2 = NdotH*NdotH;
-
-    float nom   = a2;
-    float denom = (NdotH2 * (a2 - 1.0) + 1.0);
-    denom = PI * denom * denom;
-
-    return nom / max(denom, 0.001);
-}
-
-float GeometrySchlickGGX(float NdotV, float roughness)
-{
-    float r = (roughness + 1.0);
-    float k = (r*r) / 8.0;
-
-    float nom   = NdotV;
-    float denom = NdotV * (1.0 - k) + k;
-
-    return nom / denom;
-}
-
-float GeometrySmith(vec3 N, vec3 V, vec3 L, float roughness)
-{
-    float NdotV = max(dot(N, V), 0.0);
-    float NdotL = max(dot(N, L), 0.0);
-    float ggx2 = GeometrySchlickGGX(NdotV, roughness);
-    float ggx1 = GeometrySchlickGGX(NdotL, roughness);
-
-    return ggx1 * ggx2;
-}
-
-vec3 fresnelSchlick(float cosTheta, vec3 F0)
-{
-    return F0 + (1.0 - F0) * pow(max(1.0 - cosTheta, 0.0), 5.0);
-}
-
-void main()
-{
-    vec3 N = normalize(Normal);
-    vec3 V = normalize(camPos - WorldPos);
-
-    vec3 F0 = vec3(0.04);
-    F0 = mix(F0, albedo, metallic);
-
-    vec3 Lo = vec3(0.0);
-    for(int i = 0; i < 1; ++i)
-    {
-        vec3 L = normalize(lightPositions[i] - WorldPos);
-        vec3 H = normalize(V + L);
-        float distance = length(lightPositions[i] - WorldPos);
-        float attenuation = 1.0 / (distance * distance);
-        vec3 radiance = lightColors[i] * attenuation;
-
-        float NDF = DistributionGGX(N, H, roughness);
-        float G   = GeometrySmith(N, V, L, roughness);
-        vec3 F    = fresnelSchlick(max(dot(H, V), 0.0), F0);
-
-        vec3 numerator    = NDF * G * F;
-        float denominator = 4.0 * max(dot(N, V), 0.0) * max(dot(N, L), 0.0) + 0.001;
-        vec3 specular = numerator / denominator;
-
-        vec3 kS = F;
-        vec3 kD = vec3(1.0) - kS;
-        kD *= 1.0 - metallic;
-
-        float NdotL = max(dot(N, L), 0.0);
-
-        Lo += (kD * albedo / PI + specular) * radiance * NdotL;
-    }
-
-    vec3 ambient = vec3(0.03) * albedo;
-    vec3 color = ambient + Lo;
-
-    // HDR tonemapping & gamma correction
-    color = color / (color + vec3(1.0));
-    color = pow(color, vec3(1.0/2.2));
-
-    FragColor = vec4(color, 1.0);
-}
-)";
 
 PBRWidget::PBRWidget(QWidget *parent)
     : QOpenGLWidget(parent)
@@ -168,27 +35,48 @@ PBRWidget::~PBRWidget()
     doneCurrent();
 }
 
+static QString readShaderSource(const QString &filePath)
+{
+    QFile file(filePath);
+    if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+        qCritical() << "Failed to open shader file:" << filePath;
+        return QString();
+    }
+    QTextStream stream(&file);
+    return stream.readAll();
+}
+
 void PBRWidget::initializeGL()
 {
     // 获取 OpenGL 函数指针（必须在此调用，因为上下文已激活）
-    m_glFunc = QOpenGLContext::currentContext()->functions();
+     m_glFunc = QOpenGLContext::currentContext()->functions();
     if (!m_glFunc) {
         qCritical() << "Failed to get OpenGL functions";
         return;
     }
 
+    qDebug() << "OpenGL version:" << QString::fromLatin1((const char*)glGetString(GL_VERSION));
+
     m_glFunc->glEnable(GL_DEPTH_TEST);
 
+    // 加载着色器源码
+    QString vertexSource = readShaderSource("pbr.vert");
+    QString fragmentSource = readShaderSource("pbr.frag");
+    if (vertexSource.isEmpty() || fragmentSource.isEmpty()) {
+        qCritical() << "Shader source loading failed.";
+        return;
+    }
+
     m_program.create();
-    if (!m_program.addShaderFromSourceCode(QOpenGLShader::Vertex, vertexShaderSource))
+    if (!m_program.addShaderFromSourceCode(QOpenGLShader::Vertex, vertexSource))
         qDebug() << "Vertex shader error:" << m_program.log();
-    if (!m_program.addShaderFromSourceCode(QOpenGLShader::Fragment, fragmentShaderSource))
+    if (!m_program.addShaderFromSourceCode(QOpenGLShader::Fragment, fragmentSource))
         qDebug() << "Fragment shader error:" << m_program.log();
     if (!m_program.link())
         qDebug() << "Shader link error:" << m_program.log();
 
-    // 尝试加载外部模型（默认可执行文件同目录下的 model.obj）
-    QString modelPath = "model.obj";
+    // 尝试加载外部模型（默认可执行文件同目录下的 cyborg.obj）
+    QString modelPath = "cyborg.obj";
     loadModel(modelPath);
 
     if (m_meshes.empty()) {
@@ -209,7 +97,6 @@ void PBRWidget::paintGL()
     m_glFunc->glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
     m_program.bind();
-
     m_program.setUniformValue("camPos", m_cameraPos);
     m_program.setUniformValue("projection", m_projection);
     m_program.setUniformValue("view", m_view);

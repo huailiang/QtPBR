@@ -8,6 +8,7 @@ set(CMAKE_AUTOMOC ON)
 find_package(Qt6 COMPONENTS Widgets OpenGLWidgets OpenGL REQUIRED)
 find_package(Assimp REQUIRED)
 
+
 add_executable(QtPBRDemo main.cpp pbrwidget.cpp)
 
 target_link_libraries(QtPBRDemo
@@ -15,4 +16,13 @@ target_link_libraries(QtPBRDemo
     Qt6::OpenGLWidgets
     Qt6::OpenGL
     assimp::assimp
+)
+
+# 复制着色器文件到可执行文件目录
+add_custom_command(TARGET QtPBRDemo POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy
+        ${CMAKE_CURRENT_SOURCE_DIR}/pbr.vert
+        ${CMAKE_CURRENT_SOURCE_DIR}/pbr.frag
+        ${CMAKE_CURRENT_SOURCE_DIR}/assets/cyborg.obj
+        $<TARGET_FILE_DIR:QtPBRDemo>
 )

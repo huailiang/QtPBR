@@ -6,10 +6,7 @@
 #include <QOpenGLShaderProgram>
 #include <QOpenGLVertexArrayObject>
 #include <QOpenGLBuffer>
-#include <QMouseEvent>
 #include <QWheelEvent>
-#include <QVector3D>
-#include <QMatrix4x4>
 #include <vector>
 #include <memory>
 
