@@ -11,6 +11,9 @@ uniform vec3 albedo;
 uniform float metallic;
 uniform float roughness;
 
+uniform bool useAlbedoMap;
+uniform sampler2D albedoMap;
+
 uniform vec3 lightPositions[1];
 uniform vec3 lightColors[1];
 
@@ -61,8 +64,14 @@ void main()
     vec3 N = normalize(Normal);
     vec3 V = normalize(camPos - WorldPos);
 
+    // 获取反照率：如果有纹理则采样，否则使用 uniform 颜色
+    vec3 albedoColor = albedo;
+    if (useAlbedoMap) {
+        albedoColor = texture(albedoMap, TexCoord).rgb;
+    }
+
     vec3 F0 = vec3(0.04);
-    F0 = mix(F0, albedo, metallic);
+    F0 = mix(F0, albedoColor, metallic);
 
     vec3 Lo = vec3(0.0);
     for(int i = 0; i < 1; ++i)
@@ -87,15 +96,15 @@ void main()
 
         float NdotL = max(dot(N, L), 0.0);
 
-        Lo += (kD * albedo / PI + specular) * radiance * NdotL;
+        Lo += (kD * albedoColor / PI + specular) * radiance * NdotL;
     }
 
-    vec3 ambient = vec3(0.03) * albedo;
+    vec3 ambient = vec3(0.03) * albedoColor;
     vec3 color = ambient + Lo;
 
     // HDR tonemapping & gamma correction
     color = color / (color + vec3(1.0));
     color = pow(color, vec3(1.0/2.2));
 
-    FragColor = vec4(color, 1.0);
+    FragColor = vec4(albedoColor, 1.0);
 }

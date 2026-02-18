@@ -18,11 +18,11 @@ target_link_libraries(QtPBRDemo
     assimp::assimp
 )
 
-# 复制着色器文件到可执行文件目录
 add_custom_command(TARGET QtPBRDemo POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy
         ${CMAKE_CURRENT_SOURCE_DIR}/pbr.vert
         ${CMAKE_CURRENT_SOURCE_DIR}/pbr.frag
         ${CMAKE_CURRENT_SOURCE_DIR}/assets/cyborg.obj
+        ${CMAKE_CURRENT_SOURCE_DIR}/assets/cyborg_diffuse.png
         $<TARGET_FILE_DIR:QtPBRDemo>
 )

@@ -6,11 +6,11 @@
 #include <QOpenGLShaderProgram>
 #include <QOpenGLVertexArrayObject>
 #include <QOpenGLBuffer>
+#include <QOpenGLTexture>
 #include <QWheelEvent>
 #include <vector>
 #include <memory>
 
-// Assimp 前向声明
 struct aiNode;
 struct aiScene;
 
@@ -43,9 +43,14 @@ private:
         QOpenGLVertexArrayObject vao;
         QOpenGLBuffer vbo;
         QOpenGLBuffer ebo;
+
+        // 材质属性
         QVector3D albedo = QVector3D(0.5f, 0.0f, 0.0f);
         float metallic = 0.5f;
         float roughness = 0.5f;
+
+        // 纹理
+        std::unique_ptr<QOpenGLTexture> albedoTexture;
 
         void setupMesh(QOpenGLFunctions *gl);
         void draw(QOpenGLShaderProgram &program, QOpenGLFunctions *gl);
@@ -53,11 +58,12 @@ private:
 
     void loadModel(const QString &path);
     void processAssimpNode(aiNode *node, const aiScene *scene);
-    void generateSphereMesh(Mesh &mesh, float radius, int sectors, int stacks);
+    QOpenGLTexture* loadTexture(const QString &path) const;
 
     QOpenGLShaderProgram m_program;
     std::vector<std::unique_ptr<Mesh>> m_meshes;
-    QOpenGLFunctions *m_glFunc = nullptr;  // 缓存 OpenGL 函数指针
+    QOpenGLFunctions *m_glFunc = nullptr;
+    QString m_modelDir;
 
     // camera
     QVector3D m_cameraPos;
