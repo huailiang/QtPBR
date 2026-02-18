@@ -2,8 +2,9 @@
 out vec4 FragColor;
 
 in vec3 WorldPos;
-in vec3 Normal;
 in vec2 TexCoord;
+in mat3 TBN;
+
 
 uniform vec3 camPos;
 
@@ -13,6 +14,8 @@ uniform float roughness;
 
 uniform bool useAlbedoMap;
 uniform sampler2D albedoMap;
+uniform bool useNormalMap;
+uniform sampler2D normalMap;
 
 uniform vec3 lightPositions[1];
 uniform vec3 lightColors[1];
@@ -61,10 +64,19 @@ vec3 fresnelSchlick(float cosTheta, vec3 F0)
 
 void main()
 {
-    vec3 N = normalize(Normal);
+    vec3 N;
+    if (useNormalMap) {
+        // 从法线贴图采样切线空间法线，并转换到世界空间
+        vec3 tangentNormal = texture(normalMap, TexCoord).rgb;
+        tangentNormal = normalize(tangentNormal * 2.0 - 1.0); // 映射到 [-1,1]
+        N = normalize(TBN * tangentNormal);
+    } else {
+        N = normalize(TBN[2]); // 使用顶点法线（TBN 的第三列）
+    }
+
     vec3 V = normalize(camPos - WorldPos);
 
-    // 获取反照率：如果有纹理则采样，否则使用 uniform 颜色
+    // 获取反照率
     vec3 albedoColor = albedo;
     if (useAlbedoMap) {
         albedoColor = texture(albedoMap, TexCoord).rgb;
@@ -80,7 +92,7 @@ void main()
         vec3 H = normalize(V + L);
         float distance = length(lightPositions[i] - WorldPos);
         float attenuation = 1.0 / (distance * distance);
-        vec3 radiance = lightColors[i] * attenuation;
+        vec3 radiance = lightColors[i] * attenuation * 0.1;
 
         float NDF = DistributionGGX(N, H, roughness);
         float G   = GeometrySmith(N, V, L, roughness);
@@ -106,5 +118,5 @@ void main()
     color = color / (color + vec3(1.0));
     color = pow(color, vec3(1.0/2.2));
 
-    FragColor = vec4(albedoColor, 1.0);
+    FragColor = vec4(color, 1.0);
 }

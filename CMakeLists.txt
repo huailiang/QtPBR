@@ -24,5 +24,6 @@ add_custom_command(TARGET QtPBRDemo POST_BUILD
         ${CMAKE_CURRENT_SOURCE_DIR}/pbr.frag
         ${CMAKE_CURRENT_SOURCE_DIR}/assets/cyborg.obj
         ${CMAKE_CURRENT_SOURCE_DIR}/assets/cyborg_diffuse.png
+        ${CMAKE_CURRENT_SOURCE_DIR}/assets/cyborg_normal.png
         $<TARGET_FILE_DIR:QtPBRDemo>
 )

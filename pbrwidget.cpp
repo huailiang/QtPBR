@@ -49,7 +49,7 @@ static QString readShaderSource(const QString &filePath)
 }
 
 // ---------- 辅助函数：加载纹理 ----------
-QOpenGLTexture* PBRWidget::loadTexture(const QString &path) const {
+QOpenGLTexture* PBRWidget::loadTexture(const QString &path) {
     QImage image;
     if (!image.load(path)) {
         qWarning() << "Failed to load texture:" << path;
@@ -58,7 +58,7 @@ QOpenGLTexture* PBRWidget::loadTexture(const QString &path) const {
     // 转换为 RGBA 格式并翻转 Y 轴（OpenGL 原点在左下）
     image = image.convertToFormat(QImage::Format_RGBA8888);
     // 翻转图像以适应 OpenGL 坐标系 (原点在左下角)
-    image = image.flipped(Qt::Vertical);
+    // image = image.flipped(Qt::Vertical);
 
     auto texture = new QOpenGLTexture(QOpenGLTexture::Target2D);
     texture->setData(image);
@@ -250,6 +250,15 @@ void PBRWidget::processAssimpNode(aiNode *node, const aiScene *scene)
             else
                 vertex.texCoord = QVector2D(0.0f, 0.0f);
 
+             // 提取切线/双切线（需要 Assimp 的 aiProcess_CalcTangentSpace 标志）
+            if (mesh->HasTangentsAndBitangents()) {
+                vertex.tangent = QVector3D(mesh->mTangents[v].x, mesh->mTangents[v].y, mesh->mTangents[v].z);
+                vertex.bitangent = QVector3D(mesh->mBitangents[v].x, mesh->mBitangents[v].y, mesh->mBitangents[v].z);
+            } else {
+                vertex.tangent = QVector3D(1,0,0);
+                vertex.bitangent = QVector3D(0,1,0);
+            }
+
             ourMesh->vertices.push_back(vertex);
         }
 
@@ -269,14 +278,19 @@ void PBRWidget::processAssimpNode(aiNode *node, const aiScene *scene)
             material->Get(AI_MATKEY_COLOR_DIFFUSE, color);
             ourMesh->albedo = QVector3D(color.r, color.g, color.b);
 
-            // 尝试加载反照率纹理：优先 BASE_COLOR，后备 DIFFUSE
-            QOpenGLTexture *tex = nullptr;
-            QString textureFile = "cyborg_diffuse.png";
-            tex = loadTexture(textureFile);
+            // 尝试加载反照率纹理
+            QOpenGLTexture *tex = loadTexture("cyborg_diffuse.png");
             if (tex) {
                 ourMesh->albedoTexture.reset(tex);
             } else {
-                qDebug() << "Failed to load texture:" << textureFile;
+                qDebug() << "Failed to load albedo texture";
+            }
+
+            tex = loadTexture("cyborg_normal.png");
+            if (tex) {
+                ourMesh->normalTexture.reset(tex);
+            } else {
+                qDebug() << "Failed to load normal texture";
             }
             // 金属度和粗糙度仍使用固定值（可扩展为纹理）
             ourMesh->metallic = 0.2f;
@@ -310,14 +324,21 @@ void PBRWidget::Mesh::setupMesh(QOpenGLFunctions *gl)
     ebo.setUsagePattern(QOpenGLBuffer::StaticDraw);
     ebo.allocate(indices.data(), indices.size() * sizeof(unsigned int));
 
+    // position
     gl->glEnableVertexAttribArray(0);
     gl->glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, position));
-
+    // normal
     gl->glEnableVertexAttribArray(1);
     gl->glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, normal));
-
+    // texCoord
     gl->glEnableVertexAttribArray(2);
     gl->glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, texCoord));
+    // tangent
+    gl->glEnableVertexAttribArray(3);
+    gl->glVertexAttribPointer(3, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, tangent));
+    // bitangent
+    gl->glEnableVertexAttribArray(4);
+    gl->glVertexAttribPointer(4, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, bitangent));
 
     vbo.release();
     vao.release();
@@ -338,11 +359,18 @@ void PBRWidget::Mesh::draw(QOpenGLShaderProgram &program, QOpenGLFunctions *gl)
         program.setUniformValue("useAlbedoMap", false);
     }
 
+    if (normalTexture) {
+        normalTexture->bind(1);
+        program.setUniformValue("normalMap", 1);
+        program.setUniformValue("useNormalMap", true);
+    } else {
+        program.setUniformValue("useNormalMap", false);
+    }
+
     vao.bind();
     gl->glDrawElements(GL_TRIANGLES, indices.size(), GL_UNSIGNED_INT, nullptr);
     vao.release();
 
-    if (albedoTexture) {
-        albedoTexture->release();
-    }
+    if (albedoTexture) albedoTexture->release();
+    if (normalTexture) normalTexture->release();
 }

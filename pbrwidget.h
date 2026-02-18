@@ -7,7 +7,10 @@
 #include <QOpenGLVertexArrayObject>
 #include <QOpenGLBuffer>
 #include <QOpenGLTexture>
+#include <QMouseEvent>
 #include <QWheelEvent>
+#include <QVector3D>
+#include <QMatrix4x4>
 #include <vector>
 #include <memory>
 
@@ -35,6 +38,8 @@ private:
         QVector3D position;
         QVector3D normal;
         QVector2D texCoord;
+        QVector3D tangent;      // 新增
+        QVector3D bitangent;    // 新增
     };
 
     struct Mesh {
@@ -51,6 +56,7 @@ private:
 
         // 纹理
         std::unique_ptr<QOpenGLTexture> albedoTexture;
+        std::unique_ptr<QOpenGLTexture> normalTexture;   // 新增
 
         void setupMesh(QOpenGLFunctions *gl);
         void draw(QOpenGLShaderProgram &program, QOpenGLFunctions *gl);
@@ -58,7 +64,7 @@ private:
 
     void loadModel(const QString &path);
     void processAssimpNode(aiNode *node, const aiScene *scene);
-    QOpenGLTexture* loadTexture(const QString &path) const;
+    QOpenGLTexture* loadTexture(const QString &path);
 
     QOpenGLShaderProgram m_program;
     std::vector<std::unique_ptr<Mesh>> m_meshes;
