@@ -20,7 +20,7 @@
 PBRWidget::PBRWidget(QWidget *parent)
     : QOpenGLWidget(parent)
 {
-    m_cameraDistance = 5.0f;
+    m_cameraDistance = 100.0f;
     m_cameraYaw = 0.0f;
     m_cameraPitch = 0.0f;
     m_cameraPos = QVector3D(0,0,5);
@@ -36,7 +36,7 @@ PBRWidget::~PBRWidget()
     doneCurrent();
 }
 
-// ---------- 辅助函数：读取着色器源码 ----------
+// ---------- 读取着色器源码 ----------
 static QString readShaderSource(const QString &filePath)
 {
     QFile file(filePath);
@@ -48,18 +48,13 @@ static QString readShaderSource(const QString &filePath)
     return stream.readAll();
 }
 
-// ---------- 辅助函数：加载纹理 ----------
 QOpenGLTexture* PBRWidget::loadTexture(const QString &path) {
     QImage image;
     if (!image.load(path)) {
         qWarning() << "Failed to load texture:" << path;
         return nullptr;
     }
-    // 转换为 RGBA 格式并翻转 Y 轴（OpenGL 原点在左下）
     image = image.convertToFormat(QImage::Format_RGBA8888);
-    // 翻转图像以适应 OpenGL 坐标系 (原点在左下角)
-    // image = image.flipped(Qt::Vertical);
-
     auto texture = new QOpenGLTexture(QOpenGLTexture::Target2D);
     texture->setData(image);
     texture->setMinificationFilter(QOpenGLTexture::LinearMipMapLinear);
@@ -68,7 +63,6 @@ QOpenGLTexture* PBRWidget::loadTexture(const QString &path) {
     return texture;
 }
 
-// ---------- 初始化 OpenGL ----------
 void PBRWidget::initializeGL()
 {
     m_glFunc = QOpenGLContext::currentContext()->functions();
@@ -76,14 +70,10 @@ void PBRWidget::initializeGL()
         qCritical() << "Failed to get OpenGL functions";
         return;
     }
-
     qDebug() << "OpenGL version:" << QString::fromLatin1((const char*)glGetString(GL_VERSION));
-
     m_glFunc->glEnable(GL_DEPTH_TEST);
-
-    // 加载着色器
-    QString vertexSource = readShaderSource("pbr.vert");
-    QString fragmentSource = readShaderSource("pbr.frag");
+    const QString vertexSource = readShaderSource("pbr.vert");
+    const QString fragmentSource = readShaderSource("pbr.frag");
     if (vertexSource.isEmpty() || fragmentSource.isEmpty()) {
         qCritical() << "Shader source loading failed.";
         return;
@@ -97,7 +87,7 @@ void PBRWidget::initializeGL()
     if (!m_program.link())
         qDebug() << "Shader link error:" << m_program.log();
 
-    loadModel("cyborg.obj");
+    loadModel("pistol.obj");
     if (m_meshes.empty()) {
         qDebug() << "No mesh loaded.";
     }
@@ -105,36 +95,31 @@ void PBRWidget::initializeGL()
     m_lightColors[0] = QVector3D(300.0f, 300.0f, 300.0f);
 }
 
-// ---------- 绘制 ----------
 void PBRWidget::paintGL()
 {
-    m_glFunc->glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
+    m_glFunc->glClearColor(0.3f, 0.3f, 0.3f, 1.0f);
     m_glFunc->glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
     m_program.bind();
-
     m_program.setUniformValue("camPos", m_cameraPos);
     m_program.setUniformValue("projection", m_projection);
     m_program.setUniformValue("view", m_view);
     QMatrix4x4 model;
     m_program.setUniformValue("model", model);
-
     m_program.setUniformValueArray("lightPositions", m_lightPositions, 1);
     m_program.setUniformValueArray("lightColors", m_lightColors, 1);
 
     for (auto &mesh : m_meshes) {
         mesh->draw(m_program, m_glFunc);
     }
-
     m_program.release();
 }
 
 // ---------- 窗口大小改变 ----------
 void PBRWidget::resizeGL(const int w, const int h)
 {
-    const float aspect = w / (float)h;
+    const float aspect = w / static_cast<float>(h);
     m_projection.setToIdentity();
-    m_projection.perspective(45.0f, aspect, 0.1f, 100.0f);
+    m_projection.perspective(60.0f, aspect, 0.1f, 240.0f);
 }
 
 // ---------- 鼠标事件 ----------
@@ -189,24 +174,22 @@ void PBRWidget::mouseMoveEvent(QMouseEvent *event)
 
 void PBRWidget::wheelEvent(QWheelEvent *event)
 {
-    float delta = event->angleDelta().y() / 120.0f;
-    m_cameraDistance -= delta * 0.5f;
-    if (m_cameraDistance < 1.0f)
-        m_cameraDistance = 1.0f;
-    if (m_cameraDistance > 20.0f)
-        m_cameraDistance = 20.0f;
+    const float delta = event->angleDelta().y() / 120.0f;
+    m_cameraDistance -= delta * 1.5f;
+    if (m_cameraDistance < 50.0f)
+        m_cameraDistance = 50.0f;
+    if (m_cameraDistance > 200.0f)
+        m_cameraDistance = 200.0f;
 
-    float x = m_cameraDistance * cos(m_cameraYaw) * cos(m_cameraPitch);
-    float y = m_cameraDistance * sin(m_cameraPitch);
-    float z = m_cameraDistance * sin(m_cameraYaw) * cos(m_cameraPitch);
+    const float x = m_cameraDistance * cos(m_cameraYaw) * cos(m_cameraPitch);
+    const float y = m_cameraDistance * sin(m_cameraPitch);
+    const float z = m_cameraDistance * sin(m_cameraYaw) * cos(m_cameraPitch);
     m_cameraPos = QVector3D(x, y, z) + m_cameraTarget;
-
     m_view.setToIdentity();
     m_view.lookAt(m_cameraPos, m_cameraTarget, m_cameraUp);
     update();
 }
 
-// ---------- 加载模型 ----------
 void PBRWidget::loadModel(const QString &path)
 {
     const QFileInfo fileInfo(path);
@@ -214,8 +197,7 @@ void PBRWidget::loadModel(const QString &path)
         qDebug() << "Model file does not exist:" << path;
         return;
     }
-    m_modelDir = fileInfo.absolutePath();  // 保存模型目录
-
+    m_modelDir = fileInfo.absolutePath();
     Assimp::Importer importer;
     const aiScene *scene = importer.ReadFile(path.toStdString(),
         aiProcess_Triangulate |
@@ -223,23 +205,18 @@ void PBRWidget::loadModel(const QString &path)
         aiProcess_GenNormals |
         aiProcess_CalcTangentSpace
     );
-
     if (!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode) {
         qDebug() << "Assimp error:" << importer.GetErrorString();
         return;
     }
-
     processAssimpNode(scene->mRootNode, scene);
 }
 
-// ---------- 递归处理 Assimp 节点 ----------
-void PBRWidget::processAssimpNode(aiNode *node, const aiScene *scene)
+void PBRWidget::processAssimpNode(const aiNode *node, const aiScene *scene)
 {
     for (unsigned int i = 0; i < node->mNumMeshes; ++i) {
-        aiMesh *mesh = scene->mMeshes[node->mMeshes[i]];
+        const aiMesh *mesh = scene->mMeshes[node->mMeshes[i]];
         auto ourMesh = std::make_unique<Mesh>();
-
-        // 顶点数据
         for (unsigned int v = 0; v < mesh->mNumVertices; ++v) {
             Vertex vertex;
             vertex.position = QVector3D(mesh->mVertices[v].x, mesh->mVertices[v].y, mesh->mVertices[v].z);
@@ -258,7 +235,6 @@ void PBRWidget::processAssimpNode(aiNode *node, const aiScene *scene)
                 vertex.tangent = QVector3D(1,0,0);
                 vertex.bitangent = QVector3D(0,1,0);
             }
-
             ourMesh->vertices.push_back(vertex);
         }
 
@@ -271,42 +247,46 @@ void PBRWidget::processAssimpNode(aiNode *node, const aiScene *scene)
 
         // 材质处理
         if (mesh->mMaterialIndex >= 0) {
-            aiMaterial *material = scene->mMaterials[mesh->mMaterialIndex];
-
+            const aiMaterial *material = scene->mMaterials[mesh->mMaterialIndex];
             // 获取反照率颜色（后备）
             aiColor3D color(1.0f, 1.0f, 1.0f);
             material->Get(AI_MATKEY_COLOR_DIFFUSE, color);
             ourMesh->albedo = QVector3D(color.r, color.g, color.b);
 
             // 尝试加载反照率纹理
-            QOpenGLTexture *tex = loadTexture("cyborg_diffuse.png");
+            QOpenGLTexture *tex = loadTexture("Cerberus_A.png");
             if (tex) {
                 ourMesh->albedoTexture.reset(tex);
             } else {
                 qDebug() << "Failed to load albedo texture";
             }
 
-            tex = loadTexture("cyborg_normal.png");
+            tex = loadTexture("Cerberus_N.png");
             if (tex) {
                 ourMesh->normalTexture.reset(tex);
             } else {
                 qDebug() << "Failed to load normal texture";
             }
+
+            tex = loadTexture("Cerberus_RMAC.png");
+            if (tex) {
+                ourMesh->rmacTexture.reset(tex);
+            } else {
+                qDebug() << "Failed to load rmac texture";
+            }
+
             // 金属度和粗糙度仍使用固定值（可扩展为纹理）
             ourMesh->metallic = 0.2f;
             ourMesh->roughness = 0.3f;
         }
-
         ourMesh->setupMesh(m_glFunc);
         m_meshes.push_back(std::move(ourMesh));
     }
-
     for (unsigned int i = 0; i < node->mNumChildren; ++i) {
         processAssimpNode(node->mChildren[i], scene);
     }
 }
 
-// ---------- Mesh::setupMesh 实现 ----------
 void PBRWidget::Mesh::setupMesh(QOpenGLFunctions *gl)
 {
     vao.create();
@@ -344,7 +324,6 @@ void PBRWidget::Mesh::setupMesh(QOpenGLFunctions *gl)
     vao.release();
 }
 
-// ---------- Mesh::draw 实现 ----------
 void PBRWidget::Mesh::draw(QOpenGLShaderProgram &program, QOpenGLFunctions *gl)
 {
     program.setUniformValue("metallic", metallic);
@@ -365,6 +344,14 @@ void PBRWidget::Mesh::draw(QOpenGLShaderProgram &program, QOpenGLFunctions *gl)
         program.setUniformValue("useNormalMap", true);
     } else {
         program.setUniformValue("useNormalMap", false);
+    }
+
+    if (rmacTexture) {
+        rmacTexture->bind(2);
+        program.setUniformValue("rmacMap", 1);
+        program.setUniformValue("useRmacMap", true);
+    } else {
+        program.setUniformValue("useRmacMap", false);
     }
 
     vao.bind();

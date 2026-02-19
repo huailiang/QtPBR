@@ -56,14 +56,15 @@ private:
 
         // 纹理
         std::unique_ptr<QOpenGLTexture> albedoTexture;
-        std::unique_ptr<QOpenGLTexture> normalTexture;   // 新增
+        std::unique_ptr<QOpenGLTexture> normalTexture;
+        std::unique_ptr<QOpenGLTexture> rmacTexture;
 
         void setupMesh(QOpenGLFunctions *gl);
         void draw(QOpenGLShaderProgram &program, QOpenGLFunctions *gl);
     };
 
     void loadModel(const QString &path);
-    void processAssimpNode(aiNode *node, const aiScene *scene);
+    void processAssimpNode(const aiNode *node, const aiScene *scene);
     QOpenGLTexture* loadTexture(const QString &path);
 
     QOpenGLShaderProgram m_program;
@@ -85,7 +86,6 @@ private:
     QMatrix4x4 m_projection;
     QMatrix4x4 m_view;
 
-    // light
     QVector3D m_lightPositions[1];
     QVector3D m_lightColors[1];
 };

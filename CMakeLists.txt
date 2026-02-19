@@ -22,8 +22,9 @@ add_custom_command(TARGET QtPBRDemo POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy
         ${CMAKE_CURRENT_SOURCE_DIR}/pbr.vert
         ${CMAKE_CURRENT_SOURCE_DIR}/pbr.frag
-        ${CMAKE_CURRENT_SOURCE_DIR}/assets/cyborg.obj
-        ${CMAKE_CURRENT_SOURCE_DIR}/assets/cyborg_diffuse.png
-        ${CMAKE_CURRENT_SOURCE_DIR}/assets/cyborg_normal.png
+        ${CMAKE_CURRENT_SOURCE_DIR}/assets/pistol.obj
+        ${CMAKE_CURRENT_SOURCE_DIR}/assets/Cerberus_A.png
+        ${CMAKE_CURRENT_SOURCE_DIR}/assets/Cerberus_N.png
+        ${CMAKE_CURRENT_SOURCE_DIR}/assets/Cerberus_RMAC.png
         $<TARGET_FILE_DIR:QtPBRDemo>
 )
