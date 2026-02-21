@@ -7,12 +7,10 @@
 #include <QOpenGLVertexArrayObject>
 #include <QOpenGLBuffer>
 #include <QOpenGLTexture>
-#include <QMouseEvent>
 #include <QWheelEvent>
-#include <QVector3D>
-#include <QMatrix4x4>
 #include <vector>
 #include <memory>
+#include "skybox.h"
 
 struct aiNode;
 struct aiScene;
@@ -65,7 +63,7 @@ private:
 
     void loadModel(const QString &path);
     void processAssimpNode(const aiNode *node, const aiScene *scene);
-    QOpenGLTexture* loadTexture(const QString &path);
+    QOpenGLTexture* loadTexture(const QString &path) const;
 
     QOpenGLShaderProgram m_program;
     std::vector<std::unique_ptr<Mesh>> m_meshes;
@@ -88,6 +86,8 @@ private:
 
     QVector3D m_lightPositions[1];
     QVector3D m_lightColors[1];
+
+    std::unique_ptr<SkyBox> m_skybox;
 };
 
 #endif // PBRWIDGET_H

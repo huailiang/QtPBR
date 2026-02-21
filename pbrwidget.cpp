@@ -31,6 +31,7 @@ PBRWidget::PBRWidget(QWidget *parent)
 PBRWidget::~PBRWidget()
 {
     makeCurrent();
+    m_skybox.reset();
     m_meshes.clear(); // 自动释放纹理和 OpenGL 资源
     m_program.release();
     doneCurrent();
@@ -48,12 +49,8 @@ static QString readShaderSource(const QString &filePath)
     return stream.readAll();
 }
 
-QOpenGLTexture* PBRWidget::loadTexture(const QString &path) {
-    QImage image;
-    if (!image.load(path)) {
-        qWarning() << "Failed to load texture:" << path;
-        return nullptr;
-    }
+QOpenGLTexture* PBRWidget::loadTexture(const QString &path) const {
+    QImage image(path);
     image = image.convertToFormat(QImage::Format_RGBA8888);
     auto texture = new QOpenGLTexture(QOpenGLTexture::Target2D);
     texture->setData(image);
@@ -93,6 +90,11 @@ void PBRWidget::initializeGL()
     }
     m_lightPositions[0] = QVector3D(2.0f, 2.0f, 2.0f);
     m_lightColors[0] = QVector3D(300.0f, 300.0f, 300.0f);
+
+    m_skybox = std::make_unique<SkyBox>();
+    if (!m_skybox->initialize(m_glFunc)) {
+        qDebug() << "Failed to initialize skybox.";
+    }
 }
 
 void PBRWidget::paintGL()
@@ -110,6 +112,9 @@ void PBRWidget::paintGL()
 
     for (auto &mesh : m_meshes) {
         mesh->draw(m_program, m_glFunc);
+    }
+    if (m_skybox) {
+        m_skybox->render(m_glFunc, m_projection, m_view);
     }
     m_program.release();
 }

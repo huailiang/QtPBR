@@ -9,7 +9,9 @@ find_package(Qt6 COMPONENTS Widgets OpenGLWidgets OpenGL REQUIRED)
 find_package(Assimp REQUIRED)
 
 
-add_executable(QtPBRDemo main.cpp pbrwidget.cpp)
+add_executable(QtPBRDemo main.cpp
+        pbrwidget.cpp
+        skybox.cpp)
 
 target_link_libraries(QtPBRDemo
     Qt6::Widgets
@@ -26,5 +28,11 @@ add_custom_command(TARGET QtPBRDemo POST_BUILD
         ${CMAKE_CURRENT_SOURCE_DIR}/assets/Cerberus_A.png
         ${CMAKE_CURRENT_SOURCE_DIR}/assets/Cerberus_N.png
         ${CMAKE_CURRENT_SOURCE_DIR}/assets/Cerberus_RMAC.png
+        ${CMAKE_CURRENT_SOURCE_DIR}/assets/skybox/back.jpg
+        ${CMAKE_CURRENT_SOURCE_DIR}/assets/skybox/bottom.jpg
+        ${CMAKE_CURRENT_SOURCE_DIR}/assets/skybox/front.jpg
+        ${CMAKE_CURRENT_SOURCE_DIR}/assets/skybox/left.jpg
+        ${CMAKE_CURRENT_SOURCE_DIR}/assets/skybox/right.jpg
+        ${CMAKE_CURRENT_SOURCE_DIR}/assets/skybox/top.jpg
         $<TARGET_FILE_DIR:QtPBRDemo>
 )
