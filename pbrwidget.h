@@ -36,8 +36,8 @@ private:
         QVector3D position;
         QVector3D normal;
         QVector2D texCoord;
-        QVector3D tangent;      // 新增
-        QVector3D bitangent;    // 新增
+        QVector3D tangent;
+        QVector3D bitangent;
     };
 
     struct Mesh {
@@ -64,8 +64,19 @@ private:
     void loadModel(const QString &path);
     void processAssimpNode(const aiNode *node, const aiScene *scene);
     QOpenGLTexture* loadTexture(const QString &path) const;
+    void loadIBLTextures();
+    std::unique_ptr<QOpenGLTexture> loadCubemapTexture(const QString &path) const;
+    QOpenGLTexture* load2DTexture(const QString &path) const;
 
-    QOpenGLShaderProgram m_program;
+    bool generateIrradianceMap(QOpenGLTexture *envCubemap);
+    bool generatePrefilterMap(QOpenGLTexture *envCubemap);
+    void loadBRDFLUT();
+
+    QOpenGLShaderProgram m_program;          // 主渲染
+    QOpenGLShaderProgram m_convProgram;      // 通用转换
+    QOpenGLShaderProgram m_irradianceProgram;
+    QOpenGLShaderProgram m_prefilterProgram;
+
     std::vector<std::unique_ptr<Mesh>> m_meshes;
     QOpenGLFunctions *m_glFunc = nullptr;
     QString m_modelDir;
@@ -87,7 +98,17 @@ private:
     QVector3D m_lightPositions[1];
     QVector3D m_lightColors[1];
 
+    // 天空盒
     std::unique_ptr<SkyBox> m_skybox;
+
+    // IBL 纹理
+    std::unique_ptr<QOpenGLTexture> m_irradianceMap;
+    std::unique_ptr<QOpenGLTexture> m_prefilterMap;
+    QOpenGLTexture* m_brdfLUTTexture;
+
+    // 立方体 VAO（用于渲染到立方体贴图）
+    QOpenGLVertexArrayObject m_cubeVAO;
+    QOpenGLBuffer m_cubeVBO;
 };
 
 #endif // PBRWIDGET_H

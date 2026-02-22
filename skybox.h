@@ -23,6 +23,11 @@ public:
 
     void reset();
 
+    QOpenGLTexture* getCubemapTexture() const
+    {
+        return m_cubemapTexture.get();
+    }
+
 private:
     // 着色器程序
     QOpenGLShaderProgram m_convProgram;    // 用于 HDR -> 立方体贴图的转换

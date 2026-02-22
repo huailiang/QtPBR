@@ -3,7 +3,6 @@
 #include <QOpenGLFramebufferObject>
 #include <QDebug>
 
-// 确保在项目中有 stb_image.h 文件
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
 
@@ -159,7 +158,7 @@ bool SkyBox::generateCubemapFromHDR(QOpenGLFunctions *gl, const QString &hdrFile
     hdrTexture.setData(0, 0, QOpenGLTexture::RGB, QOpenGLTexture::Float32, data);
     stbi_image_free(data);
 
-    // 3. 创建目标立方体贴图（大小可调整）
+    // 3. 创建目标立方体贴图
     constexpr int cubemapSize = 1024;
     m_cubemapTexture = std::make_unique<QOpenGLTexture>(QOpenGLTexture::TargetCubeMap);
     m_cubemapTexture->setSize(cubemapSize, cubemapSize);
@@ -184,7 +183,7 @@ bool SkyBox::generateCubemapFromHDR(QOpenGLFunctions *gl, const QString &hdrFile
         QVector3D target; // 相机看向的方向
         QVector3D up;     // 上方向
     };
-    FaceData faces[6] = {
+    const FaceData faces[6] = {
         { QVector3D( 1.0f,  0.0f,  0.0f), QVector3D(0.0f, -1.0f,  0.0f) }, // +X
         { QVector3D(-1.0f,  0.0f,  0.0f), QVector3D(0.0f, -1.0f,  0.0f) }, // -X
         { QVector3D( 0.0f,  1.0f,  0.0f), QVector3D(0.0f,  0.0f,  1.0f) }, // +Y

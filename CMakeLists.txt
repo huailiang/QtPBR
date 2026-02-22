@@ -11,8 +11,7 @@ find_package(Assimp REQUIRED)
 
 add_executable(QtPBRDemo main.cpp
         pbrwidget.cpp
-        skybox.cpp
-        stb_image.h)
+        skybox.cpp)
 
 target_link_libraries(QtPBRDemo
     Qt6::Widgets
@@ -23,12 +22,18 @@ target_link_libraries(QtPBRDemo
 
 add_custom_command(TARGET QtPBRDemo POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy
-        ${CMAKE_CURRENT_SOURCE_DIR}/pbr.vert
-        ${CMAKE_CURRENT_SOURCE_DIR}/pbr.frag
+        ${CMAKE_CURRENT_SOURCE_DIR}/shader/pbr.vert
+        ${CMAKE_CURRENT_SOURCE_DIR}/shader/pbr.frag
+        ${CMAKE_CURRENT_SOURCE_DIR}/shader/irradiance.frag
+        ${CMAKE_CURRENT_SOURCE_DIR}/shader/conv.vert
+        ${CMAKE_CURRENT_SOURCE_DIR}/shader/prefilter.frag
         ${CMAKE_CURRENT_SOURCE_DIR}/assets/pistol.obj
         ${CMAKE_CURRENT_SOURCE_DIR}/assets/Cerberus_A.png
         ${CMAKE_CURRENT_SOURCE_DIR}/assets/Cerberus_N.png
         ${CMAKE_CURRENT_SOURCE_DIR}/assets/Cerberus_RMAC.png
         ${CMAKE_CURRENT_SOURCE_DIR}/assets/skybox.hdr
+        ${CMAKE_CURRENT_SOURCE_DIR}/assets/radiance.hdr
+        ${CMAKE_CURRENT_SOURCE_DIR}/assets/irrdiance.hdr
+        ${CMAKE_CURRENT_SOURCE_DIR}/assets/ibl_brdf_lut.png
         $<TARGET_FILE_DIR:QtPBRDemo>
 )
