@@ -8,8 +8,6 @@
 #include <QOpenGLTexture>
 #include <QString>
 #include <memory>
-#include <QVector3D>
-#include <QMatrix4x4>
 
 class SkyBox
 {
@@ -17,19 +15,30 @@ public:
     SkyBox();
     ~SkyBox();
 
-
-    void reset();
-
-    // 初始化：加载立方体贴图纹理和编译着色器
+    // 初始化：从 HDR 文件生成立方体贴图
     bool initialize(QOpenGLFunctions *gl);
+
     // 渲染天空盒
     void render(QOpenGLFunctions *gl, const QMatrix4x4 &projection, const QMatrix4x4 &view);
 
+    void reset();
+
 private:
-    QOpenGLShaderProgram m_program;
-    QOpenGLVertexArrayObject m_vao;
-    QOpenGLBuffer m_vbo;
+    // 着色器程序
+    QOpenGLShaderProgram m_convProgram;    // 用于 HDR -> 立方体贴图的转换
+    QOpenGLShaderProgram m_skyboxProgram;  // 用于最终渲染
+
+    // 几何体
+    QOpenGLVertexArrayObject m_cubeVAO;
+    QOpenGLBuffer m_cubeVBO;
+
+    // 纹理
     std::unique_ptr<QOpenGLTexture> m_cubemapTexture;
+
+    // 辅助函数
+    bool createCubeGeometry(QOpenGLFunctions *gl);
+    bool compileShaderPrograms(QOpenGLFunctions *gl);
+    bool generateCubemapFromHDR(QOpenGLFunctions *gl, const QString &hdrFile);
 };
 
 #endif // SKYBOX_H

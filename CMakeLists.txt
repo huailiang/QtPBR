@@ -29,11 +29,6 @@ add_custom_command(TARGET QtPBRDemo POST_BUILD
         ${CMAKE_CURRENT_SOURCE_DIR}/assets/Cerberus_A.png
         ${CMAKE_CURRENT_SOURCE_DIR}/assets/Cerberus_N.png
         ${CMAKE_CURRENT_SOURCE_DIR}/assets/Cerberus_RMAC.png
-        ${CMAKE_CURRENT_SOURCE_DIR}/assets/skybox/back.jpg
-        ${CMAKE_CURRENT_SOURCE_DIR}/assets/skybox/bottom.jpg
-        ${CMAKE_CURRENT_SOURCE_DIR}/assets/skybox/front.jpg
-        ${CMAKE_CURRENT_SOURCE_DIR}/assets/skybox/left.jpg
-        ${CMAKE_CURRENT_SOURCE_DIR}/assets/skybox/right.jpg
-        ${CMAKE_CURRENT_SOURCE_DIR}/assets/skybox/top.jpg
+        ${CMAKE_CURRENT_SOURCE_DIR}/assets/skybox.hdr
         $<TARGET_FILE_DIR:QtPBRDemo>
 )

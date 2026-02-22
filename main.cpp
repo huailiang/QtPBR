@@ -14,7 +14,7 @@ int main(int argc, char *argv[])
     QSurfaceFormat::setDefaultFormat(format);
 
     QMainWindow window;
-    window.setWindowTitle("Qt6 PBR Mesh Demo");
+    window.setWindowTitle("Qt6 PBR Demo");
     PBRWidget *pbrWidget = new PBRWidget(&window);
     window.setCentralWidget(pbrWidget);
     window.resize(1024, 768);

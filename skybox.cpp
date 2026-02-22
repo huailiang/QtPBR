@@ -1,52 +1,40 @@
-#include "stb_image.h"
 #include "skybox.h"
+#include <QImage>
+#include <QOpenGLFramebufferObject>
+#include <QDebug>
+
+// 确保在项目中有 stb_image.h 文件
+#define STB_IMAGE_IMPLEMENTATION
+#include "stb_image.h"
 
 SkyBox::SkyBox() {}
-SkyBox::~SkyBox() {
-}
 
-void SkyBox::reset() {
-    m_vao.release();
-    m_vbo.release();
-    if (m_cubemapTexture) {
-        m_cubemapTexture.release();
-    }
-    m_program.release();
-}
+SkyBox::~SkyBox() {}
 
 bool SkyBox::initialize(QOpenGLFunctions *gl)
 {
-    // 1. 编译着色器 (非常简单的着色器，只需传递位置)
-    const char *vsrc = R"(
-        #version 330 core
-        layout (location = 0) in vec3 aPos;
-        out vec3 TexCoords;
-        uniform mat4 projection;
-        uniform mat4 view;
-        void main()
-        {
-            TexCoords = aPos;
-            vec4 pos = projection * view * vec4(aPos, 1.0);
-            gl_Position = pos.xyww;
-        })";
-    const char *fsrc = R"(
-        #version 330 core
-        out vec4 FragColor;
-        in vec3 TexCoords;
-        uniform samplerCube skybox;
-        void main()
-        {
-            FragColor = texture(skybox, TexCoords);
-        })";
+    createCubeGeometry(gl);
 
-    if (!m_program.addShaderFromSourceCode(QOpenGLShader::Vertex, vsrc) ||
-        !m_program.addShaderFromSourceCode(QOpenGLShader::Fragment, fsrc) ||
-        !m_program.link()) {
-        qDebug() << "SkyBox shader error:" << m_program.log();
+    if (!compileShaderPrograms(gl))
         return false;
-    }
 
-    // 2. 设置天空盒的几何体 (一个单位立方体的顶点)
+    if (!generateCubemapFromHDR(gl, "skybox.hdr"))
+        return false;
+
+    return true;
+}
+
+void SkyBox::reset() {
+    if (m_cubemapTexture) {
+        m_cubemapTexture.release();
+    }
+    m_convProgram.release();
+    m_skyboxProgram.release();
+}
+
+bool SkyBox::createCubeGeometry(QOpenGLFunctions *gl)
+{
+    // 单位立方体的 36 个顶点（6 个面 * 2 个三角形 * 3 个顶点）
     constexpr float vertices[] = {
         -1.0f,  1.0f, -1.0f,  -1.0f, -1.0f, -1.0f,  1.0f, -1.0f, -1.0f,
          1.0f, -1.0f, -1.0f,   1.0f,  1.0f, -1.0f, -1.0f,  1.0f, -1.0f,
@@ -62,68 +50,219 @@ bool SkyBox::initialize(QOpenGLFunctions *gl)
          1.0f, -1.0f, -1.0f,  -1.0f, -1.0f,  1.0f,  1.0f, -1.0f,  1.0f
     };
 
-    m_vao.create();
-    m_vao.bind();
+    m_cubeVAO.create();
+    m_cubeVAO.bind();
 
-    m_vbo.create();
-    m_vbo.bind();
-    m_vbo.allocate(vertices, sizeof(vertices));
+    m_cubeVBO.create();
+    m_cubeVBO.bind();
+    m_cubeVBO.allocate(vertices, sizeof(vertices));
 
     gl->glEnableVertexAttribArray(0);
     gl->glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
 
-    m_vbo.release();
-    m_vao.release();
+    m_cubeVBO.release();
+    m_cubeVAO.release();
+    return true;
+}
 
+bool SkyBox::compileShaderPrograms(QOpenGLFunctions *gl)
+{
+    // ---- 转换着色器：将 HDR 经纬图转换为立方体贴图 ----
+    const char *convVS = R"(
+        #version 330 core
+        layout (location = 0) in vec3 aPos;
+        out vec3 WorldPos;
+        uniform mat4 projection;
+        uniform mat4 view;
+        void main() {
+            WorldPos = aPos;
+            gl_Position = projection * view * vec4(aPos, 1.0);
+        }
+    )";
+    const char *convFS = R"(
+        #version 330 core
+        out vec4 FragColor;
+        in vec3 WorldPos;
+        uniform sampler2D hdrEquirectangular;
+        const vec2 invAtan = vec2(0.1591, 0.3183);
+        vec2 SampleSphericalMap(vec3 v) {
+            vec2 uv = vec2(atan(v.z, v.x), asin(v.y));
+            uv *= invAtan;
+            uv += 0.5;
+            return uv;
+        }
+        void main() {
+            vec2 uv = SampleSphericalMap(normalize(WorldPos));
+            uv.y = 1.0 - uv.y;
+            vec3 color = texture(hdrEquirectangular, uv).rgb;
+            FragColor = vec4(color, 1.0);
+        }
+    )";
+
+    if (!m_convProgram.addShaderFromSourceCode(QOpenGLShader::Vertex, convVS) ||
+        !m_convProgram.addShaderFromSourceCode(QOpenGLShader::Fragment, convFS) ||
+        !m_convProgram.link()) {
+        qDebug() << "Conv shader error:" << m_convProgram.log();
+        return false;
+    }
+
+    // ---- 天空盒渲染着色器 ----
+    const char *skyVS = R"(
+        #version 330 core
+        layout (location = 0) in vec3 aPos;
+        out vec3 TexCoords;
+        uniform mat4 projection;
+        uniform mat4 view;
+        void main() {
+            TexCoords = aPos;
+            vec4 pos = projection * view * vec4(aPos, 1.0);
+            gl_Position = pos.xyww;
+        }
+    )";
+    const char *skyFS = R"(
+        #version 330 core
+        out vec4 FragColor;
+        in vec3 TexCoords;
+        uniform samplerCube skybox;
+        void main() {
+            FragColor = texture(skybox, TexCoords);
+        }
+    )";
+
+    if (!m_skyboxProgram.addShaderFromSourceCode(QOpenGLShader::Vertex, skyVS) ||
+        !m_skyboxProgram.addShaderFromSourceCode(QOpenGLShader::Fragment, skyFS) ||
+        !m_skyboxProgram.link()) {
+        qDebug() << "Skybox shader error:" << m_skyboxProgram.log();
+        return false;
+    }
+
+    return true;
+}
+bool SkyBox::generateCubemapFromHDR(QOpenGLFunctions *gl, const QString &hdrFile)
+{
+    // 1. 加载 HDR 图片
+    int width, height, channels;
+    float *data = stbi_loadf(hdrFile.toLocal8Bit().data(), &width, &height, &channels, 3);
+    if (!data) {
+        qWarning() << "Failed to load HDR file:" << hdrFile;
+        return false;
+    }
+
+    // 2. 创建 2D 纹理存放 HDR 经纬图
+    QOpenGLTexture hdrTexture(QOpenGLTexture::Target2D);
+    hdrTexture.setSize(width, height);
+    hdrTexture.setFormat(QOpenGLTexture::RGB16F);
+    hdrTexture.setMinificationFilter(QOpenGLTexture::Linear);
+    hdrTexture.setMagnificationFilter(QOpenGLTexture::Linear);
+    hdrTexture.setWrapMode(QOpenGLTexture::ClampToEdge);
+    hdrTexture.allocateStorage();
+    hdrTexture.setData(0, 0, QOpenGLTexture::RGB, QOpenGLTexture::Float32, data);
+    stbi_image_free(data);
+
+    // 3. 创建目标立方体贴图（大小可调整）
+    constexpr int cubemapSize = 1024;
     m_cubemapTexture = std::make_unique<QOpenGLTexture>(QOpenGLTexture::TargetCubeMap);
-    m_cubemapTexture->setSize(2048, 2048); // 假设纹理是 1024x1024
-    m_cubemapTexture->setFormat(QOpenGLTexture::RGB8_UNorm);
-    m_cubemapTexture->allocateStorage();
-
-    // 为六个面分别加载图片, sourceFormat是QOpenGLTexture::BGRA, 这里调整了下效果
-    QImage imagePosY("top.jpg");
-    m_cubemapTexture->setData(0, 0, QOpenGLTexture::CubeMapPositiveY, QOpenGLTexture::RGBA, QOpenGLTexture::UInt8, imagePosY.bits());
-
-    QImage imageNegY("bottom.jpg");
-    m_cubemapTexture->setData(0, 0, QOpenGLTexture::CubeMapNegativeY, QOpenGLTexture::RGBA, QOpenGLTexture::UInt8, imageNegY.bits());
-
-    QImage imagePosX("right.jpg");
-    m_cubemapTexture->setData(0, 0, QOpenGLTexture::CubeMapPositiveX, QOpenGLTexture::RGBA, QOpenGLTexture::UInt8, imagePosX.bits());
-
-    QImage imageNegX("left.jpg");
-    m_cubemapTexture->setData(0, 0, QOpenGLTexture::CubeMapNegativeX, QOpenGLTexture::RGBA, QOpenGLTexture::UInt8, imageNegX.bits());
-
-    QImage imagePosZ("front.jpg");
-    m_cubemapTexture->setData(0, 0, QOpenGLTexture::CubeMapPositiveZ, QOpenGLTexture::RGBA, QOpenGLTexture::UInt8, imagePosZ.bits());
-
-    QImage imageNegZ("back.jpg");
-    m_cubemapTexture->setData(0, 0, QOpenGLTexture::CubeMapNegativeZ, QOpenGLTexture::RGBA, QOpenGLTexture::UInt8, imageNegZ.bits());
-
-    m_cubemapTexture->setMinificationFilter(QOpenGLTexture::Linear);
+    m_cubemapTexture->setSize(cubemapSize, cubemapSize);
+    m_cubemapTexture->setFormat(QOpenGLTexture::RGB16F);
+    m_cubemapTexture->setMinificationFilter(QOpenGLTexture::LinearMipMapLinear);
     m_cubemapTexture->setMagnificationFilter(QOpenGLTexture::Linear);
     m_cubemapTexture->setWrapMode(QOpenGLTexture::ClampToEdge);
+    m_cubemapTexture->allocateStorage();
+
+    // 4. 设置 FBO（包含深度缓冲）
+    QOpenGLFramebufferObjectFormat fboFormat;
+    fboFormat.setInternalTextureFormat(GL_RGB16F);
+    fboFormat.setAttachment(QOpenGLFramebufferObject::Depth);
+    QOpenGLFramebufferObject fbo(cubemapSize, cubemapSize, fboFormat);
+
+    // 5. 投影矩阵：90° 视场，宽高比 1:1，近远平面适当
+    QMatrix4x4 captureProjection;
+    captureProjection.perspective(90.0, 1.0, 0.1, 10.0);
+
+    // 6. 标准视图方向与上方向（已验证正确）
+    struct FaceData {
+        QVector3D target; // 相机看向的方向
+        QVector3D up;     // 上方向
+    };
+    FaceData faces[6] = {
+        { QVector3D( 1.0f,  0.0f,  0.0f), QVector3D(0.0f, -1.0f,  0.0f) }, // +X
+        { QVector3D(-1.0f,  0.0f,  0.0f), QVector3D(0.0f, -1.0f,  0.0f) }, // -X
+        { QVector3D( 0.0f,  1.0f,  0.0f), QVector3D(0.0f,  0.0f,  1.0f) }, // +Y
+        { QVector3D( 0.0f, -1.0f,  0.0f), QVector3D(0.0f,  0.0f, -1.0f) }, // -Y
+        { QVector3D( 0.0f,  0.0f,  1.0f), QVector3D(0.0f, -1.0f,  0.0f) }, // +Z
+        { QVector3D( 0.0f,  0.0f, -1.0f), QVector3D(0.0f, -1.0f,  0.0f) }  // -Z
+    };
+
+    // 7. 绑定转换着色器
+    m_convProgram.bind();
+    m_convProgram.setUniformValue("hdrEquirectangular", 0);
+    hdrTexture.bind(0);
+
+    gl->glViewport(0, 0, cubemapSize, cubemapSize);
+    gl->glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+
+    // 8. 逐个面渲染
+    for (int i = 0; i < 6; ++i) {
+        fbo.bind();
+
+        // 将当前立方体贴图面附加到 FBO 颜色附着
+        gl->glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
+                                   GL_TEXTURE_CUBE_MAP_POSITIVE_X + i,
+                                   m_cubemapTexture->textureId(), 0);
+        if (!fbo.isValid()) {
+            qWarning() << "FBO incomplete for face" << i;
+            fbo.release();
+            break;
+        }
+
+        gl->glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+        // 构建视图矩阵：相机位于原点，看向 target，上方向为 up
+        QMatrix4x4 captureView;
+        captureView.lookAt(QVector3D(0, 0, 0), faces[i].target, faces[i].up);
+
+        m_convProgram.setUniformValue("projection", captureProjection);
+        m_convProgram.setUniformValue("view", captureView);
+
+        // 绘制单位立方体
+        m_cubeVAO.bind();
+        gl->glDrawArrays(GL_TRIANGLES, 0, 36);
+        m_cubeVAO.release();
+
+        fbo.release();
+    }
+
+    // 9. 恢复默认帧缓冲并生成 mipmap
+    QOpenGLFramebufferObject::bindDefault();
+    m_cubemapTexture->generateMipMaps();
+
+    m_convProgram.release();
+    hdrTexture.release();
+
     return true;
 }
 
 void SkyBox::render(QOpenGLFunctions *gl, const QMatrix4x4 &projection, const QMatrix4x4 &view)
 {
-    gl->glDepthFunc(GL_LEQUAL); // 天空盒的深度值最大，确保它在背景
-    m_program.bind();
+    if (!m_cubemapTexture)
+        return;
 
-    // 移除视图矩阵的平移部分，使天空盒始终跟随相机
+    gl->glDepthFunc(GL_LEQUAL);
+
+    m_skyboxProgram.bind();
+
     QMatrix4x4 viewNoTranslate = view;
     viewNoTranslate.setColumn(3, QVector4D(0, 0, 0, 1));
-
-    m_program.setUniformValue("projection", projection);
-    m_program.setUniformValue("view", viewNoTranslate);
+    m_skyboxProgram.setUniformValue("projection", projection);
+    m_skyboxProgram.setUniformValue("view", viewNoTranslate);
 
     m_cubemapTexture->bind(0);
-    m_program.setUniformValue("skybox", 0);
+    m_skyboxProgram.setUniformValue("skybox", 0);
 
-    m_vao.bind();
+    m_cubeVAO.bind();
     gl->glDrawArrays(GL_TRIANGLES, 0, 36);
-    m_vao.release();
+    m_cubeVAO.release();
 
-    m_program.release();
-    gl->glDepthFunc(GL_LESS); // 恢复深度测试函数
+    m_skyboxProgram.release();
+    gl->glDepthFunc(GL_LESS);
 }
