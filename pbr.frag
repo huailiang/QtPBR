@@ -89,7 +89,7 @@ void main()
         vec3 H = normalize(V + L);
         float distance = length(lightPositions[i] - WorldPos);
         float attenuation = 1.0 / (distance * distance);
-        vec3 radiance = lightColors[i] * attenuation * 0.1;
+        vec3 radiance = lightColors[i] * attenuation;
         float NDF = DistributionGGX(N, H, R);
         float G = GeometrySmith(N, V, L, R);
         vec3 F = fresnelSchlick(max(dot(H, V), 0.0), F0);
@@ -102,8 +102,9 @@ void main()
         float NdotL = max(dot(N, L), 0.0);
         Lo += specular * NdotL;
     }
-    vec3 ambient = vec3(0.03) * albedoColor;
-    vec3 color = (ambient + Lo) * AO;
+    vec3 ambient = vec3(0.03) * albedoColor * AO;
+    // 最终颜色 = 直接光照 (Lo) + 间接光照 (ambient)
+    vec3 color = ambient+ Lo;
 
     // HDR tonemapping & gamma correction
     color = color / (color + vec3(1.0));

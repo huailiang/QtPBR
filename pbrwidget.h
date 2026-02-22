@@ -20,7 +20,7 @@ class PBRWidget : public QOpenGLWidget
     Q_OBJECT
 public:
     explicit PBRWidget(QWidget *parent = nullptr);
-    ~PBRWidget();
+    ~PBRWidget() override;
 
 protected:
     void initializeGL() override;

@@ -11,7 +11,8 @@ find_package(Assimp REQUIRED)
 
 add_executable(QtPBRDemo main.cpp
         pbrwidget.cpp
-        skybox.cpp)
+        skybox.cpp
+        stb_image.h)
 
 target_link_libraries(QtPBRDemo
     Qt6::Widgets

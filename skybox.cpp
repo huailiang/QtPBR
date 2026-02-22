@@ -1,3 +1,4 @@
+#include "stb_image.h"
 #include "skybox.h"
 
 SkyBox::SkyBox() {}
