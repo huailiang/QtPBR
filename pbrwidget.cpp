@@ -20,7 +20,7 @@
 
 PBRWidget::PBRWidget(QWidget *parent)
     : QOpenGLWidget(parent), m_brdfLUTTexture(nullptr) {
-    m_cameraDistance = 100.0f;
+    m_cameraDistance = 160.0f;
     m_cameraYaw = 0.0f;
     m_cameraPitch = 0.0f;
     m_cameraPos = QVector3D(0, 0, 5);
@@ -38,7 +38,7 @@ PBRWidget::~PBRWidget()
     m_brdfLUTTexture = nullptr;
     m_meshes.clear(); // 自动释放纹理和 OpenGL 资源
     m_program.release();
-    m_convProgram.release();
+    // m_convProgram.release();
     m_irradianceProgram.release();
     m_prefilterProgram.release();
     doneCurrent();
@@ -50,7 +50,7 @@ static QString readShaderSource(const QString &filePath)
     QFile file(filePath);
     if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
         qCritical() << "Failed to open shader file:" << filePath;
-        return QString();
+        return {};
     }
     QTextStream stream(&file);
     return stream.readAll();
@@ -70,7 +70,7 @@ QOpenGLTexture* PBRWidget::loadTexture(const QString &path) const {
 void PBRWidget::loadIBLTextures()
 {
     // 加载辐照度贴图
-    m_irradianceMap = loadCubemapTexture("irradiance.hdr");
+    m_irradianceMap = loadCubemapTexture("irrdiance.hdr");
     if (m_irradianceMap) {
         m_irradianceMap->setMinificationFilter(QOpenGLTexture::Linear);
         m_irradianceMap->setMagnificationFilter(QOpenGLTexture::Linear);
@@ -78,7 +78,7 @@ void PBRWidget::loadIBLTextures()
     }
 
     // 加载预滤波贴图（需启用 mipmap 过滤）
-    m_prefilterMap = loadCubemapTexture("prefilter.hdr");
+    m_prefilterMap = loadCubemapTexture("radiance.hdr");
     if (m_prefilterMap) {
         m_prefilterMap->setMinificationFilter(QOpenGLTexture::LinearMipMapLinear);
         m_prefilterMap->setMagnificationFilter(QOpenGLTexture::Linear);
@@ -177,7 +177,7 @@ bool PBRWidget::generateIrradianceMap(QOpenGLTexture *envCubemap)
     m_irradianceProgram.release();
     envCubemap->release();
 
-     m_irradianceMap->setMinificationFilter(QOpenGLTexture::Linear);
+    m_irradianceMap->setMinificationFilter(QOpenGLTexture::Linear);
     m_irradianceMap->setMagnificationFilter(QOpenGLTexture::Linear);
     m_irradianceMap->setWrapMode(QOpenGLTexture::ClampToEdge);
     return true;
@@ -289,7 +289,6 @@ void PBRWidget::initializeGL()
     m_lightPositions[0] = QVector3D(2.0f, 2.0f, 2.0f);
     m_lightColors[0] = QVector3D(300.0f, 300.0f, 300.0f);
 
-
     constexpr float cubeVerts[] = {
         -1.0f,  1.0f, -1.0f,  -1.0f, -1.0f, -1.0f,  1.0f, -1.0f, -1.0f,
          1.0f, -1.0f, -1.0f,   1.0f,  1.0f, -1.0f, -1.0f,  1.0f, -1.0f,
@@ -319,6 +318,7 @@ void PBRWidget::initializeGL()
         generatePrefilterMap(m_skybox->getCubemapTexture());
     }
     loadBRDFLUT();
+    moveWith(30);
 }
 
 void PBRWidget::loadBRDFLUT()
@@ -345,26 +345,27 @@ void PBRWidget::paintGL()
     m_program.setUniformValueArray("lightPositions", m_lightPositions, 1);
     m_program.setUniformValueArray("lightColors", m_lightColors, 1);
 
+    if (m_irradianceMap) {
+        m_irradianceMap->bind(3);
+        m_program.setUniformValue("irradianceMap", 2);
+    }
+    if (m_prefilterMap) {
+        m_prefilterMap->bind(4);
+        m_program.setUniformValue("prefilterMap", 3);
+    }
+    if (m_brdfLUTTexture) {
+        m_brdfLUTTexture->bind(5);
+        m_program.setUniformValue("brdfLUT", 4);
+    }
+
     for (const auto &mesh : m_meshes) {
         mesh->draw(m_program, m_glFunc);
     }
+
     if (m_skybox) {
         m_skybox->render(m_glFunc, m_projection, m_view);
     }
 
-     // 绑定 IBL 纹理
-    if (m_irradianceMap) {
-        m_irradianceMap->bind(2);
-        m_program.setUniformValue("irradianceMap", 2);
-    }
-    if (m_prefilterMap) {
-        m_prefilterMap->bind(3);
-        m_program.setUniformValue("prefilterMap", 3);
-    }
-    if (m_brdfLUTTexture) {
-        m_brdfLUTTexture->bind(4);
-        m_program.setUniformValue("brdfLUT", 4);
-    }
     m_program.release();
 }
 
@@ -390,33 +391,33 @@ void PBRWidget::mousePressEvent(QMouseEvent *event)
 
 void PBRWidget::mouseMoveEvent(QMouseEvent *event)
 {
-    QPoint delta = event->pos() - m_lastMousePos;
+    const QPoint delta = event->pos() - m_lastMousePos;
     if (m_mousePressed) {
-        float sensitivity = 0.005f;
+        constexpr float sensitivity = 0.005f;
         m_cameraYaw -= delta.x() * sensitivity;
         m_cameraPitch += delta.y() * sensitivity;
-        const float pitchLimit = M_PI / 2 - 0.01f;
+        constexpr float pitchLimit = M_PI / 2 - 0.01f;
         if (m_cameraPitch > pitchLimit)
             m_cameraPitch = pitchLimit;
         if (m_cameraPitch < -pitchLimit)
             m_cameraPitch = -pitchLimit;
 
-        float x = m_cameraDistance * cos(m_cameraYaw) * cos(m_cameraPitch);
-        float y = m_cameraDistance * sin(m_cameraPitch);
-        float z = m_cameraDistance * sin(m_cameraYaw) * cos(m_cameraPitch);
+        const float x = m_cameraDistance * cos(m_cameraYaw) * cos(m_cameraPitch);
+        const float y = m_cameraDistance * sin(m_cameraPitch);
+        const float z = m_cameraDistance * sin(m_cameraYaw) * cos(m_cameraPitch);
         m_cameraPos = QVector3D(x, y, z) + m_cameraTarget;
 
         m_view.setToIdentity();
         m_view.lookAt(m_cameraPos, m_cameraTarget, m_cameraUp);
         update();
     } else if (m_mouseRightPressed) {
-        float sensitivity = 0.005f * m_cameraDistance;
-        QVector3D right = QVector3D::crossProduct(m_cameraTarget - m_cameraPos, m_cameraUp).normalized();
-        QVector3D up = QVector3D::crossProduct(right, (m_cameraTarget - m_cameraPos).normalized()).normalized();
+        const float sensitivity = 0.005f * m_cameraDistance;
+        const QVector3D right = QVector3D::crossProduct(m_cameraTarget - m_cameraPos, m_cameraUp).normalized();
+        const QVector3D up = QVector3D::crossProduct(right, (m_cameraTarget - m_cameraPos).normalized()).normalized();
         m_cameraTarget += right * delta.x() * sensitivity;
         m_cameraTarget += up * delta.y() * sensitivity;
 
-        QVector3D dir = (m_cameraPos - m_cameraTarget).normalized();
+        const QVector3D dir = (m_cameraPos - m_cameraTarget).normalized();
         m_cameraPos = m_cameraTarget + dir * m_cameraDistance;
 
         m_view.setToIdentity();
@@ -429,6 +430,11 @@ void PBRWidget::mouseMoveEvent(QMouseEvent *event)
 void PBRWidget::wheelEvent(QWheelEvent *event)
 {
     const float delta = event->angleDelta().y() / 120.0f;
+    moveWith(delta);
+}
+
+void PBRWidget::moveWith(const float delta)
+{
     m_cameraDistance -= delta * 1.5f;
     if (m_cameraDistance < 50.0f)
         m_cameraDistance = 50.0f;
@@ -510,15 +516,12 @@ void PBRWidget::processAssimpNode(const aiNode *node, const aiScene *scene)
             // 尝试加载反照率纹理
             QOpenGLTexture *tex = loadTexture("Cerberus_A.png");
             ourMesh->albedoTexture.reset(tex);
-            delete tex;
 
             tex = loadTexture("Cerberus_N.png");
             ourMesh->normalTexture.reset(tex);
-            delete tex;
 
             tex = loadTexture("Cerberus_RMAC.png");
             ourMesh->rmacTexture.reset(tex);
-            delete tex;
 
             // 金属度和粗糙度仍使用固定值（可扩展为纹理）
             ourMesh->metallic = 0.2f;

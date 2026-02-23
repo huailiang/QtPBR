@@ -15,6 +15,10 @@ uniform bool useNormalMap;
 uniform sampler2D normalMap;
 uniform bool useRmacMap;
 uniform sampler2D rmacMap;
+uniform samplerCube irradianceMap;
+uniform samplerCube prefilterMap;
+uniform sampler2D brdfLUT;
+
 uniform vec3 lightPositions[1];
 uniform vec3 lightColors[1];
 
@@ -55,6 +59,10 @@ vec3 fresnelSchlick(float cosTheta, vec3 F0)
     return F0 + (1.0 - F0) * pow(max(1.0 - cosTheta, 0.0), 5.0);
 }
 
+vec3 fresnelSchlickRoughness(float cosTheta, vec3 F0, float roughness) {
+    return F0 + (max(vec3(1.0 - roughness), F0) - F0) * pow(max(1.0 - cosTheta, 0.0), 5.0);
+}
+
 void main()
 {
     vec3 N;
@@ -80,15 +88,17 @@ void main()
     if (useAlbedoMap) {
         albedoColor = texture(albedoMap, TexCoord).rgb;
     }
+
+    // 直接光照
     vec3 F0 = vec3(0.04);
     F0 = mix(F0, albedoColor, M);
     vec3 Lo = vec3(0.0);
-    for(int i = 0; i < 1; ++i)
+    for(int i = 0; i < 2; ++i)
     {
         vec3 L = normalize(lightPositions[i] - WorldPos);
         vec3 H = normalize(V + L);
         float distance = length(lightPositions[i] - WorldPos);
-        float attenuation = 1.0 / (distance * distance);
+        float attenuation = 4.0 / (distance * distance);
         vec3 radiance = lightColors[i] * attenuation;
         float NDF = DistributionGGX(N, H, R);
         float G = GeometrySmith(N, V, L, R);
@@ -102,9 +112,23 @@ void main()
         float NdotL = max(dot(N, L), 0.0);
         Lo += specular * NdotL;
     }
-    vec3 ambient = vec3(0.03) * albedoColor * AO;
-    // 最终颜色 = 直接光照 (Lo) + 间接光照 (ambient)
-    vec3 color = ambient+ Lo;
+    // 间接光照 (IBL)
+    vec3 irradiance = texture(irradianceMap, N).rgb;
+    vec3 diffuse = irradiance * albedoColor * 2;
+
+      // 镜面 IBL
+    vec3 F = fresnelSchlickRoughness(max(dot(N, V), 0.0), F0, roughness);
+    vec3 kS = F;
+    vec3 kD = 1.0 - kS;
+    kD *= 1.0 - metallic;
+    const int MAX_REFLECTION_LOD = 4;
+    float lod = roughness * MAX_REFLECTION_LOD;
+    vec3 prefilteredColor = textureLod(prefilterMap, vec3(R), lod).rgb;
+    vec2 envBRDF = texture(brdfLUT, vec2(max(dot(N, V), 0.0), roughness)).rg;
+    vec3 specular = prefilteredColor * (F * envBRDF.x + envBRDF.y);
+
+    // final color = direct light (Lo) + indirect light (ambient)
+    vec3 color = (diffuse + specular) + Lo;
 
     // HDR tonemapping & gamma correction
     color = color / (color + vec3(1.0));

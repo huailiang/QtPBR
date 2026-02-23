@@ -8,7 +8,10 @@
 ![](screenshot/cmft.png)
 
 
-![](screenshot/qt.png)
+![](screenshot/normal.png)
+
+
+![](screenshot/render.png)
 
 ## 待实现
 1. skybox 模糊效果，突出渲染主体
