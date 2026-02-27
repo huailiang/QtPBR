@@ -12,8 +12,8 @@
 class SkyBox
 {
 public:
-    SkyBox();
-    ~SkyBox();
+    SkyBox() = default;
+    ~SkyBox() = default;
 
     // 初始化：从 HDR 文件生成立方体贴图
     bool initialize(QOpenGLFunctions *gl);

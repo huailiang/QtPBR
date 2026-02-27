@@ -11,12 +11,12 @@
 #include <QOpenGLVertexArrayObject>
 #include <QOpenGLTexture>
 #include <QMouseEvent>
-#include <QFile>
 #include <QFileInfo>
 #include <vector>
 #include <memory>
 #include <cstddef>
 #include "hdr2Cube.h"
+#include "common.h"
 
 PBRWidget::PBRWidget(QWidget *parent)
     : QOpenGLWidget(parent), m_brdfLUTTexture(nullptr) {
@@ -42,18 +42,6 @@ PBRWidget::~PBRWidget()
     m_irradianceProgram.release();
     m_prefilterProgram.release();
     doneCurrent();
-}
-
-// ---------- 读取着色器源码 ----------
-static QString readShaderSource(const QString &filePath)
-{
-    QFile file(filePath);
-    if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
-        qCritical() << "Failed to open shader file:" << filePath;
-        return {};
-    }
-    QTextStream stream(&file);
-    return stream.readAll();
 }
 
 QOpenGLTexture* PBRWidget::loadTexture(const QString &path) const {
@@ -138,16 +126,6 @@ bool PBRWidget::generateIrradianceMap(QOpenGLTexture *envCubemap)
     QMatrix4x4 captureProjection;
     captureProjection.perspective(90.0, 1.0, 0.1, 10.0);
 
-    struct Face { QVector3D target, up; };
-    Face faces[6] = {
-        { QVector3D( 1,0,0), QVector3D(0,-1,0) },
-        { QVector3D(-1,0,0), QVector3D(0,-1,0) },
-        { QVector3D( 0,1,0), QVector3D(0,0,1) },
-        { QVector3D( 0,-1,0), QVector3D(0,0,-1) },
-        { QVector3D( 0,0,1), QVector3D(0,-1,0) },
-        { QVector3D( 0,0,-1), QVector3D(0,-1,0) }
-    };
-
     m_glFunc->glViewport(0, 0, size, size);
     m_irradianceProgram.bind();
     m_irradianceProgram.setUniformValue("environmentMap", 0);
@@ -222,8 +200,8 @@ bool PBRWidget::generatePrefilterMap(QOpenGLTexture *envCubemap)
     envCubemap->bind(0);
 
     for (int mip = 0; mip < maxMipLevels; ++mip) {
-        int mipSize = baseSize / pow(2, mip);
-        float roughness = (float)mip / (float)(maxMipLevels - 1);
+        const int mipSize = baseSize / pow(2, mip);
+        const float roughness = (float)mip / (float)(maxMipLevels - 1);
 
         QOpenGLFramebufferObject fbo(mipSize, mipSize, fboFormat);
         m_glFunc->glViewport(0, 0, mipSize, mipSize);

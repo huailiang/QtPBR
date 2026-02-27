@@ -3,6 +3,7 @@ set(SOURCES
     main.cpp
     pbrwidget.cpp
     skybox.cpp
+        common.h
 )
 
 # 项目根目录（相对于当前文件位置）
@@ -14,8 +15,11 @@ set(ASSET_DIR ${PROJECT_ROOT}/assets)
 set(SHADER_FILES
     ${SHADER_DIR}/pbr.vert
     ${SHADER_DIR}/pbr.frag
+    ${SHADER_DIR}/sky.vert
+    ${SHADER_DIR}/sky.frag
     ${SHADER_DIR}/irradiance.frag
     ${SHADER_DIR}/conv.vert
+    ${SHADER_DIR}/conv.frag
     ${SHADER_DIR}/prefilter.frag
 )
 

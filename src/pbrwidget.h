@@ -2,10 +2,6 @@
 #define PBRWIDGET_H
 
 #include <QOpenGLWidget>
-#include <QOpenGLFunctions>
-#include <QOpenGLShaderProgram>
-#include <QOpenGLVertexArrayObject>
-#include <QOpenGLBuffer>
 #include <QOpenGLTexture>
 #include <QWheelEvent>
 #include <vector>
