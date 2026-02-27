@@ -30,28 +30,12 @@ void SkyBox::reset() {
 
 bool SkyBox::createCubeGeometry(QOpenGLFunctions *gl)
 {
-    // 单位立方体的 36 个顶点（6 个面 * 2 个三角形 * 3 个顶点）
-    constexpr float vertices[] = {
-        -1.0f,  1.0f, -1.0f,  -1.0f, -1.0f, -1.0f,  1.0f, -1.0f, -1.0f,
-         1.0f, -1.0f, -1.0f,   1.0f,  1.0f, -1.0f, -1.0f,  1.0f, -1.0f,
-        -1.0f, -1.0f,  1.0f,  -1.0f, -1.0f, -1.0f, -1.0f,  1.0f, -1.0f,
-        -1.0f,  1.0f, -1.0f,  -1.0f,  1.0f,  1.0f, -1.0f, -1.0f,  1.0f,
-         1.0f, -1.0f, -1.0f,   1.0f, -1.0f,  1.0f,  1.0f,  1.0f,  1.0f,
-         1.0f,  1.0f,  1.0f,   1.0f,  1.0f, -1.0f,  1.0f, -1.0f, -1.0f,
-        -1.0f, -1.0f,  1.0f,  -1.0f,  1.0f,  1.0f,  1.0f,  1.0f,  1.0f,
-         1.0f,  1.0f,  1.0f,   1.0f, -1.0f,  1.0f, -1.0f, -1.0f,  1.0f,
-        -1.0f,  1.0f, -1.0f,   1.0f,  1.0f, -1.0f,  1.0f,  1.0f,  1.0f,
-         1.0f,  1.0f,  1.0f,  -1.0f,  1.0f,  1.0f, -1.0f,  1.0f, -1.0f,
-        -1.0f, -1.0f, -1.0f,  -1.0f, -1.0f,  1.0f,  1.0f, -1.0f, -1.0f,
-         1.0f, -1.0f, -1.0f,  -1.0f, -1.0f,  1.0f,  1.0f, -1.0f,  1.0f
-    };
-
     m_cubeVAO.create();
     m_cubeVAO.bind();
 
     m_cubeVBO.create();
     m_cubeVBO.bind();
-    m_cubeVBO.allocate(vertices, sizeof(vertices));
+    m_cubeVBO.allocate(cubeVerts, sizeof(cubeVerts));
 
     gl->glEnableVertexAttribArray(0);
     gl->glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
@@ -143,7 +127,7 @@ bool SkyBox::generateCubemapFromHDR(QOpenGLFunctions *gl, const QString &hdrFile
         gl->glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         // 构建视图矩阵：相机位于原点，看向 target，上方向为 up
         QMatrix4x4 captureView;
-        captureView.lookAt(QVector3D(0, 0, 0), faces[i].target, faces[i].up);
+        captureView.lookAt(QVector3D(0, 0, 0), cubeFaces[i].target, cubeFaces[i].up);
 
         m_convProgram.setUniformValue("projection", captureProjection);
         m_convProgram.setUniformValue("view", captureView);

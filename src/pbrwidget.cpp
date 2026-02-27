@@ -140,7 +140,7 @@ bool PBRWidget::generateIrradianceMap(QOpenGLTexture *envCubemap)
         m_glFunc->glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         QMatrix4x4 captureView;
-        captureView.lookAt(QVector3D(0,0,0), faces[i].target, faces[i].up);
+        captureView.lookAt(QVector3D(0,0,0), cubeFaces[i].target, cubeFaces[i].up);
         m_irradianceProgram.setUniformValue("projection", captureProjection);
         m_irradianceProgram.setUniformValue("view", captureView);
 
@@ -267,19 +267,6 @@ void PBRWidget::initializeGL()
     m_lightPositions[0] = QVector3D(2.0f, 2.0f, 2.0f);
     m_lightColors[0] = QVector3D(300.0f, 300.0f, 300.0f);
 
-    constexpr float cubeVerts[] = {
-        -1.0f,  1.0f, -1.0f,  -1.0f, -1.0f, -1.0f,  1.0f, -1.0f, -1.0f,
-         1.0f, -1.0f, -1.0f,   1.0f,  1.0f, -1.0f, -1.0f,  1.0f, -1.0f,
-        -1.0f, -1.0f,  1.0f,  -1.0f, -1.0f, -1.0f, -1.0f,  1.0f, -1.0f,
-        -1.0f,  1.0f, -1.0f,  -1.0f,  1.0f,  1.0f, -1.0f, -1.0f,  1.0f,
-         1.0f, -1.0f, -1.0f,   1.0f, -1.0f,  1.0f,  1.0f,  1.0f,  1.0f,
-         1.0f,  1.0f,  1.0f,   1.0f,  1.0f, -1.0f,  1.0f, -1.0f, -1.0f,
-        -1.0f, -1.0f,  1.0f,  -1.0f,  1.0f,  1.0f,  1.0f,  1.0f,  1.0f,
-         1.0f,  1.0f,  1.0f,   1.0f, -1.0f,  1.0f, -1.0f, -1.0f,  1.0f,
-        -1.0f,  1.0f, -1.0f,   1.0f,  1.0f, -1.0f,  1.0f,  1.0f,  1.0f,
-         1.0f,  1.0f,  1.0f,  -1.0f,  1.0f,  1.0f, -1.0f,  1.0f, -1.0f,
-        -1.0f, -1.0f, -1.0f,  -1.0f, -1.0f,  1.0f,  1.0f, -1.0f, -1.0f,
-         1.0f, -1.0f, -1.0f,  -1.0f, -1.0f,  1.0f,  1.0f, -1.0f,  1.0f }; // 36个顶点数据
     m_cubeVAO.create(); m_cubeVAO.bind();
     m_cubeVBO.create(); m_cubeVBO.bind();
     m_cubeVBO.allocate(cubeVerts, sizeof(cubeVerts));
