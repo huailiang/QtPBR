@@ -3,15 +3,21 @@
 
 此工程主要基于Qt OpenGL实现PBR效果，目标是实现cmftStudio引擎搭建的效果
 
-
+### cmftStudio渲染效果
 
 ![](screenshot/cmft.png)
 
+### 法线
 
 ![](screenshot/normal.png)
 
+### 渲染效果
 
 ![](screenshot/render.png)
+
+### 背景模糊效果
+
+![](screenshot/blur.png)
 
 ## 待实现
 1. skybox 模糊效果，突出渲染主体

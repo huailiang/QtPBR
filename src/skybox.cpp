@@ -108,7 +108,6 @@ bool SkyBox::generateCubemapFromHDR(QOpenGLFunctions *gl, const QString &hdrFile
     m_convProgram.bind();
     m_convProgram.setUniformValue("hdrEquirectangular", 0);
     hdrTexture.bind(0);
-
     gl->glViewport(0, 0, cubemapSize, cubemapSize);
     gl->glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 
@@ -128,7 +127,6 @@ bool SkyBox::generateCubemapFromHDR(QOpenGLFunctions *gl, const QString &hdrFile
         // 构建视图矩阵：相机位于原点，看向 target，上方向为 up
         QMatrix4x4 captureView;
         captureView.lookAt(QVector3D(0, 0, 0), cubeFaces[i].target, cubeFaces[i].up);
-
         m_convProgram.setUniformValue("projection", captureProjection);
         m_convProgram.setUniformValue("view", captureView);
 
@@ -155,9 +153,7 @@ void SkyBox::render(QOpenGLFunctions *gl, const QMatrix4x4 &projection, const QM
         return;
 
     gl->glDepthFunc(GL_LEQUAL);
-
     m_skyboxProgram.bind();
-
     QMatrix4x4 viewNoTranslate = view;
     viewNoTranslate.setColumn(3, QVector4D(0, 0, 0, 1));
     m_skyboxProgram.setUniformValue("projection", projection);
